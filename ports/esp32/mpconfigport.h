@@ -268,6 +268,6 @@ typedef long mp_off_t;
 
 // board specifics
 
-#define MICROPY_HW_BOARD_NAME "ESP32 module"
+#define MICROPY_HW_BOARD_NAME "BoF X Badge"
 #define MICROPY_HW_MCU_NAME "ESP32"
 #define MICROPY_PY_SYS_PLATFORM "esp32"
