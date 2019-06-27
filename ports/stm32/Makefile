@@ -92,6 +92,7 @@ CFLAGS += -fsingle-precision-constant -Wdouble-promotion
 endif
 
 LDFLAGS = -nostdlib -L $(LD_DIR) $(addprefix -T,$(LD_FILES)) -Map=$(@:.elf=.map) --cref
+LDFLAGS += --defsym=_estack_reserve=8
 LIBS = $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 
 # Remove uncalled code from the final image.
@@ -222,7 +223,7 @@ SRC_C = \
 	usbd_desc.c \
 	usbd_cdc_interface.c \
 	usbd_hid_interface.c \
-	usbd_msc_storage.c \
+	usbd_msc_interface.c \
 	mphalport.c \
 	mpthreadport.c \
 	irq.c \
@@ -349,7 +350,6 @@ SRC_USBDEV = $(addprefix $(USBDEV_DIR)/,\
 	class/src/usbd_cdc_msc_hid.c \
 	class/src/usbd_msc_bot.c \
 	class/src/usbd_msc_scsi.c \
-	class/src/usbd_msc_data.c \
 	)
 
 ifeq ($(MICROPY_PY_NETWORK_CYW43),1)
@@ -394,6 +394,11 @@ SRC_MOD += $(addprefix $(CC3000_DIR)/src/,\
 	patch.c \
 	patch_prog.c \
 	)
+endif
+
+ifeq ($(MICROPY_SSL_MBEDTLS),1)
+CFLAGS_MOD += -DMBEDTLS_CONFIG_FILE='"mbedtls/mbedtls_config.h"'
+SRC_MOD += mbedtls/mbedtls_port.c
 endif
 
 OBJ =
@@ -509,6 +514,12 @@ $(BUILD)/firmware.elf: $(OBJ)
 	$(ECHO) "LINK $@"
 	$(Q)$(LD) $(LDFLAGS) -o $@ $^ $(LDFLAGS_MOD) $(LIBS)
 	$(Q)$(SIZE) $@
+ifneq ($(TEXT0_ADDR),0x08000000)
+	$(ECHO) "INFO: this build requires mboot to be installed first"
+endif
+ifeq ($(TEXT1_ADDR),0x90000000)
+	$(ECHO) "INFO: this build places firmware in external QSPI flash"
+endif
 
 PLLVALUES = boards/pllvalues.py
 MAKE_PINS = boards/make-pins.py

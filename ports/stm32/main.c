@@ -39,11 +39,13 @@
 
 #if MICROPY_PY_LWIP
 #include "lwip/init.h"
+#include "lwip/apps/mdns.h"
 #include "drivers/cyw43/cyw43.h"
 #endif
 
 #include "systick.h"
 #include "pendsv.h"
+#include "powerctrl.h"
 #include "pybthread.h"
 #include "gccollect.h"
 #include "factoryreset.h"
@@ -367,6 +369,9 @@ STATIC uint update_reset_mode(uint reset_mode) {
 #endif
 
 void stm32_main(uint32_t reset_mode) {
+    // Check if bootloader should be entered instead of main application
+    powerctrl_check_enter_bootloader();
+
     // Enable caches and prefetch buffers
 
     #if defined(STM32F4)
@@ -479,6 +484,9 @@ void stm32_main(uint32_t reset_mode) {
     // because the system timeout list (next_timeout) is only ever reset by BSS clearing.
     // So for now we only init the lwIP stack once on power-up.
     lwip_init();
+    #if LWIP_MDNS_RESPONDER
+    mdns_resp_init();
+    #endif
     systick_enable_dispatch(SYSTICK_DISPATCH_LWIP, mod_network_lwip_poll_wrapper);
     #endif
 
@@ -532,7 +540,7 @@ soft_reset:
     // to recover from limit hit.  (Limit is measured in bytes.)
     // Note: stack control relies on main thread being initialised above
     mp_stack_set_top(&_estack);
-    mp_stack_set_limit((char*)&_estack - (char*)&_heap_end - 1024);
+    mp_stack_set_limit((char*)&_estack - (char*)&_sstack - 1024);
 
     // GC init
     gc_init(MICROPY_HEAP_START, MICROPY_HEAP_END);
@@ -641,7 +649,7 @@ soft_reset:
     #if MICROPY_HW_ENABLE_USB
     // init USB device to default setting if it was not already configured
     if (!(pyb_usb_flags & PYB_USB_FLAG_USB_MODE_CALLED)) {
-        pyb_usb_dev_init(USBD_VID, USBD_PID_CDC_MSC, USBD_MODE_CDC_MSC, NULL);
+        pyb_usb_dev_init(USBD_VID, USBD_PID_CDC_MSC, USBD_MODE_CDC_MSC, 0, NULL, NULL);
     }
     #endif
 
